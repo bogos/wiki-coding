@@ -6,22 +6,22 @@ import gzip
 import os
 import pandas as pd
 import wget
+import sys
 
 class WikiGzFiles():
-    def __init__(self, save_file_path = './data'):
-        self.save_file_path = "./data"
+    def __init__(self, saveFilePath = './data'):
+        self.saveFilePath = "./data"
 
     def createUrlPath(self, year, month, day, hour):
         return f"https://dumps.wikimedia.org/other/pageviews/{year}/{year}-{month}/pageviews-{year}{month}{day}-{hour}0000.gz"
         
-    def downloadGzFile(self, date_array):
-        year, month, day, hour = date_array
+    def downloadGzFile(self, dateArray):
+        year, month, day, hour = dateArray
         url = self.createUrlPath(year, month, day, hour)
         print("URL", url)
         try:
             response = req.get(url, allow_redirects=True)
             fileName = f"pageviews-{year}{month}{day}-{hour}0000"
-            # open(f"{fileName}.gz", "wb").write(response.content)
             wget.download(url, f"{fileName}.gz", bar=None)
             print(f"DONE The file {fileName}.gz is downloaded and saved")
             return fileName
@@ -32,25 +32,25 @@ class WikiGzFiles():
     def extractGzFile(self, fileName):
         try:
             with gzip.open(f"{fileName}.gz", 'rb') as f:
-                with open(f"{self.save_file_path}/{fileName}", 'wb') as fOut:
+                with open(f"{self.saveFilePath}/{fileName}", 'wb') as fOut:
                     fileContent = f.read()
                     fOut.write(fileContent)
-                    return f"EXTRACTED file in {self.save_file_path}/{fileName}"
+                    return f"EXTRACTED file in {self.saveFilePath}/{fileName}"
         except Exception as e:
             print(e)
             return e
     
-    def downloadThread(self, date_array):
+    def downloadThread(self, dateArray):
         fileNames = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = [executor.submit(self.downloadGzFile, x) for x in date_array]
+            results = [executor.submit(self.downloadGzFile, x) for x in dateArray]
 
         for f in concurrent.futures.as_completed(results):
             fileNames.append(f.result())
         return fileNames
 
     def extractThread(self, files):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             results = [executor.submit(self.extractGzFile, x) for x in files]
 
         for f in concurrent.futures.as_completed(results):
@@ -93,7 +93,7 @@ class WikiFilesAnalysis():
         return datetime.strptime(f"{hour}:00", "%H:%M").strftime("%I%p")
 
     def languageDomainThread(self, folder_path):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             files = self.getFilesFromFolder(self.folder_path)
             results = executor.map(self.languageDomain, files)
 
@@ -102,8 +102,11 @@ class WikiFilesAnalysis():
 
 if __name__ == '__main__':
     
+    # Past Hours/Docs
+    hours = 5
+
     # Get Date
-    numberDates = LastDateFormat().getLastNHoursDateFormat(5)
+    numberDates = LastDateFormat().getLastNHoursDateFormat(hours)
 
     # Download Files
     wikiFiles = WikiGzFiles()
